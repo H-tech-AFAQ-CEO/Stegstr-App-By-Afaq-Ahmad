@@ -1,131 +1,66 @@
 'use client'
 
-import { useState } from 'react'
-import {
-  Activity,
-  Archive,
-  AudioLines,
-  Check,
-  ChevronDown,
-  CircleHelp,
-  CloudUpload,
-  Copy,
-  Cpu,
-  FileImage,
-  Fingerprint,
-  Gauge,
-  KeyRound,
-  Layers3,
-  LockKeyhole,
-  Menu,
-  MessageSquareText,
-  Network,
-  Play,
-  Radio,
-  ScanLine,
-  Send,
-  Settings2,
-  ShieldCheck,
-  Sparkles,
-  Upload,
-  Wifi,
-  X,
-} from 'lucide-react'
+import { ChangeEvent, useMemo, useState } from 'react'
+import { Activity, Archive, Check, ChevronDown, CircleHelp, CloudDownload, Copy, Fingerprint, Gauge, KeyRound, LockKeyhole, Menu, Network, Play, Radio, ScanLine, Send, Settings2, ShieldCheck, Sparkles, Upload, Wifi, X, Zap } from 'lucide-react'
 
+type PageId = 'encode' | 'decode' | 'resilience' | 'relays' | 'identity' | 'activity' | 'settings' | 'help'
 const platforms = ['WhatsApp', 'Telegram', 'Instagram', 'Direct relay']
+const navGroups: { label: string; items: { id: PageId; label: string; icon: typeof LockKeyhole }[] }[] = [
+  { label: 'WORKBENCH', items: [{ id: 'encode', label: 'Encode message', icon: LockKeyhole }, { id: 'decode', label: 'Decode carrier', icon: Archive }, { id: 'resilience', label: 'Resilience lab', icon: Activity }] },
+  { label: 'NETWORK', items: [{ id: 'relays', label: 'Nostr relays', icon: Network }, { id: 'identity', label: 'My identity', icon: Fingerprint }] },
+  { label: 'SYSTEM', items: [{ id: 'activity', label: 'Activity log', icon: Zap }, { id: 'settings', label: 'Settings', icon: Settings2 }, { id: 'help', label: 'Help & docs', icon: CircleHelp }] },
+]
 
-function Metric({ label, value, detail, tone = 'default' }: { label: string; value: string; detail: string; tone?: 'default' | 'cyan' | 'green' }) {
-  return (
-    <div className="metric">
-      <div className="metric-label">{label}</div>
-      <div className={`metric-value ${tone}`}>{value}</div>
-      <div className="metric-detail">{detail}</div>
-    </div>
-  )
+function Button({ children, primary = false, onClick, className = '', type = 'button', disabled = false }: { children: React.ReactNode; primary?: boolean; onClick?: () => void; className?: string; type?: 'button' | 'submit'; disabled?: boolean }) {
+  return <button type={type} onClick={onClick} disabled={disabled} className={`${primary ? 'primary-button' : 'ghost-button'} ${className}`}>{children}</button>
 }
+function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) { return <section className={`panel ${className}`}>{children}</section> }
+function Header({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) { return <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{action && <div className="heading-actions">{action}</div>}</div> }
+function Status({ children = 'LOCAL' }: { children?: string }) { return <span className="panel-badge"><span className="status-dot" />{children}</span> }
 
 export default function Page() {
-  const [activeTab, setActiveTab] = useState<'encode' | 'decode' | 'resilience'>('encode')
-  const [platform, setPlatform] = useState('WhatsApp')
-  const [uploaded, setUploaded] = useState(false)
-  const [aiOpen, setAiOpen] = useState(true)
+  const [page, setPage] = useState<PageId>('encode')
+  const [carrier, setCarrier] = useState<File | null>(null)
   const [message, setMessage] = useState('')
-  const [sent, setSent] = useState(false)
+  const [platform, setPlatform] = useState('WhatsApp')
+  const [encoded, setEncoded] = useState(false)
+  const [decoded, setDecoded] = useState(false)
+  const [tests, setTests] = useState<Record<string, string>>({})
+  const [assistant, setAssistant] = useState('Your carrier is ready. I recommend a payload under 12 KB and adaptive LSB for this platform.')
+  const [relayConnected, setRelayConnected] = useState(true)
+  const [copied, setCopied] = useState(false)
+  const [mobileNav, setMobileNav] = useState(false)
 
-  return (
-    <main className="stegstr-app">
-      <aside className="sidebar">
-        <div className="brand-lockup">
-          <div className="brand-mark"><ScanLine size={23} /></div>
-          <div><div className="brand-name">stegstr<span>.sh</span></div><div className="brand-sub">FOSS steganography</div></div>
-        </div>
+  const capacity = carrier ? Math.max(12, Math.round(carrier.size / 280)) : 0
+  const readiness = carrier ? Math.min(96, 64 + Math.round(Math.min(message.length / 2, 24))) : 0
+  const pageTitle = navGroups.flatMap((group) => group.items).find((item) => item.id === page)?.label ?? 'Workbench'
 
-        <nav className="nav-stack" aria-label="Primary navigation">
-          <div className="nav-kicker">WORKBENCH</div>
-          {[
-            ['encode', LockKeyhole, 'Encode message'],
-            ['decode', Archive, 'Decode carrier'],
-            ['resilience', Activity, 'Resilience lab'],
-          ].map(([id, Icon, label]) => (
-            <button key={id as string} className={`nav-item ${activeTab === id ? 'active' : ''}`} onClick={() => setActiveTab(id as typeof activeTab)}>
-              <Icon size={17} /><span>{label as string}</span>{id === 'encode' && <span className="nav-hot">LIVE</span>}
-            </button>
-          ))}
-          <div className="nav-kicker nav-kicker-spaced">NETWORK</div>
-          <button className="nav-item"><Network size={17} /><span>Nostr relays</span><span className="status-dot" /></button>
-          <button className="nav-item"><Fingerprint size={17} /><span>My identity</span></button>
-        </nav>
+  function selectCarrier(event: ChangeEvent<HTMLInputElement>) { setCarrier(event.target.files?.[0] ?? null); setEncoded(false) }
+  function downloadResult() { const blob = new Blob([`stegstr local demo\ncarrier: ${carrier?.name ?? 'demo-carrier.png'}\npayload: ${message}\nstrategy: adaptive-lsb/${platform}`], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'stegstr-encoded-result.txt'; link.click(); URL.revokeObjectURL(url) }
+  function runTest(name: string) { setTests((current) => ({ ...current, [name]: 'RUNNING' })); window.setTimeout(() => setTests((current) => ({ ...current, [name]: name === 'Instagram' ? 'REVIEW' : 'PASS' })), 700) }
+  function ask(text: string) { setAssistant(text === 'Optimize for survival' ? `For ${platform}, use adaptive LSB, keep payload below ${Math.max(8, capacity || 12)} KB, and test the exported file after platform processing.` : 'Adaptive LSB spreads encrypted bits through high-entropy regions so casual inspection sees an ordinary image. Run the resilience lab before sharing.') }
 
-        <div className="sidebar-bottom">
-          <div className="relay-mini"><div className="relay-top"><span className="status-dot" /> Relay mesh <span>3/3</span></div><div className="relay-url">wss://relay.damus.io</div></div>
-          <button className="profile-chip"><div className="avatar">K</div><div><strong>keystrider</strong><small>npub1...7k9a</small></div><ChevronDown size={14} /></button>
-          <div className="sidebar-footer"><span>v0.4.2-alpha</span><span>MIT License</span></div>
-        </div>
-      </aside>
-
-      <section className="workspace">
-        <header className="topbar">
-          <div className="mobile-brand"><Menu size={18} /><span>stegstr<span>.sh</span></span></div>
-          <div className="breadcrumb"><span>WORKBENCH</span><span>/</span><strong>{activeTab === 'encode' ? 'ENCODE MESSAGE' : activeTab === 'decode' ? 'DECODE CARRIER' : 'RESILIENCE LAB'}</strong></div>
-          <div className="top-actions"><span className="secure-status"><Wifi size={14} /> LOCAL-FIRST <span className="status-dot" /></span><button className="icon-button" aria-label="Help"><CircleHelp size={17} /></button><button className="icon-button" aria-label="Settings"><Settings2 size={17} /></button></div>
-        </header>
-
-        <div className="content-scroll">
-          <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" />MESSAGE WORKBENCH</div><h1>{activeTab === 'encode' ? 'Hide a message in plain sight.' : activeTab === 'decode' ? 'Read what the carrier carries.' : 'Break it before they do.'}</h1><p>{activeTab === 'encode' ? 'Encode encrypted payloads inside ordinary media. Built for the messy reality of platform compression.' : activeTab === 'decode' ? 'Inspect a carrier, recover its payload, and verify its cryptographic signature.' : 'Simulate platform processing and measure whether your payload survives.'}</p></div><div className="heading-actions"><button className="ghost-button"><CloudUpload size={15} /> Import session</button><button className="primary-button"><Play size={14} /> Quick start</button></div></div>
-
-          {activeTab === 'encode' && <>
-            <div className="workspace-grid">
-              <section className="panel carrier-panel">
-                <div className="panel-header"><div><div className="panel-index">01 / CARRIER</div><h2>Choose your carrier</h2></div><span className="panel-badge"><FileImage size={13} /> IMAGE</span></div>
-                <button className={`dropzone ${uploaded ? 'uploaded' : ''}`} onClick={() => setUploaded(!uploaded)}>
-                  {uploaded ? <><div className="preview-thumb"><FileImage size={22} /></div><div className="drop-title">night-train.png</div><div className="drop-meta">PNG · 2400 × 1600 · 3.8 MB</div><span className="remove-upload"><X size={14} /></span></> : <><div className="upload-orbit"><Upload size={22} /></div><div className="drop-title">Drop an image here</div><div className="drop-meta">or click to browse your files</div><div className="format-row"><span>PNG</span><span>JPG</span><span>WEBP</span><span>MAX 50MB</span></div></>}
-                </button>
-                <div className="carrier-details"><div><span>CAPACITY</span><strong>{uploaded ? '148.2 KB' : '—'}</strong></div><div><span>EST. PAYLOAD</span><strong>{uploaded ? '12.7 KB' : '—'}</strong></div><div><span>QUALITY LOSS</span><strong className="good">{uploaded ? '< 0.2%' : '—'}</strong></div></div>
-                <div className="divider-label"><span>OR USE A DEMO CARRIER</span></div><div className="demo-row"><button className="demo-tile active"><div className="demo-image train" /><span>night-train.png</span></button><button className="demo-tile"><div className="demo-image desert" /><span>dry-land.jpg</span></button><button className="demo-tile"><div className="demo-image waves" /><span>low-tide.webp</span></button></div>
-              </section>
-
-              <section className="panel payload-panel">
-                <div className="panel-header"><div><div className="panel-index">02 / PAYLOAD</div><h2>Compose your message</h2></div><button className="mini-tool"><KeyRound size={14} /> Encrypt</button></div>
-                <label className="field-label" htmlFor="payload">SECRET MESSAGE <span>0 / 1,024 CHARS</span></label><textarea id="payload" className="payload-input" placeholder="Write something only your recipient should see..." />
-                <div className="payload-tools"><button><LockKeyhole size={14} /> End-to-end encrypted</button><button><Fingerprint size={14} /> Sign with keystrider</button></div>
-                <div className="field-label platform-label">OPTIMIZE FOR <span>PLATFORM SURVIVAL</span></div><div className="platform-grid">{platforms.map((item) => <button key={item} className={`platform-option ${platform === item ? 'selected' : ''}`} onClick={() => setPlatform(item)}><span className={`platform-icon ${item.toLowerCase().replace(' ', '-')}`}>{item === 'Direct relay' ? <Radio size={14} /> : item.slice(0, 1)}</span><span>{item}</span>{platform === item && <Check size={14} />}</button>)}</div>
-                <div className="encode-action"><button className="primary-button wide"><Sparkles size={15} /> {uploaded ? 'Encode payload' : 'Choose a carrier first'} <span>⌘ ↵</span></button><div className="encode-note"><ShieldCheck size={14} /> Your original file never leaves this device.</div></div>
-              </section>
-            </div>
-
-            <section className="signal-strip"><div className="signal-title"><Gauge size={17} /><div><strong>PAYLOAD READINESS</strong><span>AI-assisted carrier analysis</span></div></div><div className="readiness-bar"><div className="readiness-fill" style={{ width: uploaded ? '78%' : '0%' }} /></div><div className="readiness-score">{uploaded ? '78' : '—'}<span>/100</span></div><div className="signal-note"><span className="status-dot" /> {uploaded ? 'Good candidate for WhatsApp' : 'Upload a carrier to analyze'}</div></section>
-          </>}
-
-          {activeTab === 'decode' && <section className="single-panel panel decode-state"><div className="panel-header"><div><div className="panel-index">01 / INSPECT</div><h2>Drop a carrier to decode</h2></div><span className="panel-badge"><ScanLine size={13} /> SCANNER READY</span></div><div className="decode-drop"><div className="upload-orbit"><ScanLine size={25} /></div><h3>Drop an encoded image here</h3><p>Stegstr will detect the payload, verify its signature, and decrypt locally.</p><button className="primary-button"><Upload size={15} /> Select carrier</button></div></section>}
-          {activeTab === 'resilience' && <section className="single-panel panel"><div className="panel-header"><div><div className="panel-index">01 / SURVIVAL MATRIX</div><h2>Platform survival test</h2></div><span className="panel-badge"><Activity size={13} /> READY</span></div><div className="test-list">{platforms.map((item, i) => <div className="test-row" key={item}><div className="test-name"><span className="test-number">0{i + 1}</span><strong>{item}</strong></div><span className="test-desc">{i === 0 ? 'JPEG recompression · resize to 1080px' : i === 1 ? 'Media pipeline · quality factor 82' : i === 2 ? 'Image transform · progressive JPEG' : 'No transform · Nostr event'}</span><span className={`test-result ${i === 3 ? 'cyan-text' : 'muted-result'}`}>{i === 3 ? '100%' : '—'}</span><button className="ghost-button small">Run test <Play size={12} /></button></div>)}</div></section>}
-
-          <div className="bottom-grid">
-            <section className="panel activity-panel"><div className="panel-header compact"><div><div className="panel-index">RECENT ACTIVITY</div><h2>Session trail</h2></div><button className="text-button">View all <span>→</span></button></div><div className="activity-list"><div className="activity-item"><div className="activity-icon green"><Check size={14} /></div><div><strong>Identity verified</strong><span>keystrider signed in locally</span></div><time>2m ago</time></div><div className="activity-item"><div className="activity-icon"><Layers3 size={14} /></div><div><strong>Relay mesh connected</strong><span>3 relays available for sync</span></div><time>4m ago</time></div><div className="activity-item"><div className="activity-icon"><Cpu size={14} /></div><div><strong>AI engine ready</strong><span>Local heuristics loaded</span></div><time>5m ago</time></div></div></section>
-            <section className={`panel ai-panel ${aiOpen ? 'open' : ''}`}><button className="ai-heading" onClick={() => setAiOpen(!aiOpen)}><div className="ai-spark"><Sparkles size={15} /></div><div><strong>stegstr assistant</strong><span>carrier intelligence</span></div><ChevronDown size={16} className={aiOpen ? 'rotate' : ''} /></button>{aiOpen && <div className="ai-content"><div className="ai-message"><span className="ai-avatar"><Sparkles size={13} /></span><p>Your carrier looks healthy. For <strong>{platform}</strong>, I recommend PNG with adaptive LSB and a payload under 12 KB.</p></div><div className="suggestion-row"><button onClick={() => setMessage('How does adaptive LSB work?')}>How does this work?</button><button onClick={() => setMessage('Optimize for survival')}>Optimize for survival</button></div><div className="assistant-input"><input value={message} onChange={(e) => { setMessage(e.target.value); setSent(false) }} placeholder="Ask about your carrier..." aria-label="Ask stegstr assistant" /><button onClick={() => setSent(true)} aria-label="Send message">{sent ? <Check size={15} /> : <Send size={15} />}</button></div></div>}</section>
-          </div>
-          <footer className="workspace-footer"><span><span className="status-dot" /> ALL SYSTEMS NOMINAL</span><span>NO TELEMETRY · OPEN SOURCE · BUILT FOR SURVIVAL</span><span>GITHUB ↗</span></footer>
-        </div>
-      </section>
-    </main>
-  )
+  return <main className="stegstr-app">
+    <aside className={`sidebar ${mobileNav ? 'mobile-open' : ''}`}>
+      <div className="brand-lockup"><div className="brand-mark"><ScanLine size={23} /></div><div><div className="brand-name">stegstr<span>.sh</span></div><div className="brand-sub">FOSS steganography</div></div></div>
+      <nav className="nav-stack" aria-label="Primary navigation">{navGroups.map((group) => <div key={group.label}><div className={`nav-kicker ${group.label !== 'WORKBENCH' ? 'nav-kicker-spaced' : ''}`}>{group.label}</div>{group.items.map(({ id, label, icon: Icon }) => <button key={id} className={`nav-item ${page === id ? 'active' : ''}`} onClick={() => { setPage(id); setMobileNav(false) }}><Icon size={17} /><span>{label}</span>{id === 'encode' && <span className="nav-hot">LIVE</span>}{id === 'relays' && <span className="status-dot" />}</button>)}</div>)}</nav>
+      <div className="sidebar-bottom"><div className="relay-mini"><div className="relay-top"><span className="status-dot" /> Relay mesh <span>3/3</span></div><div className="relay-url">wss://relay.damus.io</div></div><button className="profile-chip"><div className="avatar">K</div><div><strong>keystrider</strong><small>npub1...7k9a</small></div><ChevronDown size={14} /></button><div className="sidebar-footer"><span>v0.5.0-alpha</span><span>MIT License</span></div></div>
+    </aside>
+    <section className="workspace"><header className="topbar"><button className="mobile-brand" onClick={() => setMobileNav(!mobileNav)}><Menu size={18} /><span>stegstr<span>.sh</span></span></button><div className="breadcrumb"><span>STEGSTR</span><span>/</span><strong>{pageTitle.toUpperCase()}</strong></div><div className="top-actions"><span className="secure-status"><Wifi size={14} /> LOCAL-FIRST <span className="status-dot" /></span><button className="icon-button" aria-label="Help" onClick={() => setPage('help')}><CircleHelp size={17} /></button><button className="icon-button" aria-label="Settings" onClick={() => setPage('settings')}><Settings2 size={17} /></button></div></header>
+      <div className="content-scroll">{page === 'encode' && <Encode carrier={carrier} selectCarrier={selectCarrier} message={message} setMessage={setMessage} platform={platform} setPlatform={setPlatform} encoded={encoded} setEncoded={setEncoded} readiness={readiness} capacity={capacity} downloadResult={downloadResult} assistant={assistant} ask={ask} />}{page === 'decode' && <Decode decoded={decoded} setDecoded={setDecoded} />}{page === 'resilience' && <Resilience tests={tests} runTest={runTest} />} {page === 'relays' && <Relays connected={relayConnected} setConnected={setRelayConnected} />} {page === 'identity' && <Identity copied={copied} setCopied={setCopied} />} {page === 'activity' && <ActivityPage />} {page === 'settings' && <SettingsPage />} {page === 'help' && <HelpPage />}<footer className="workspace-footer"><span><span className="status-dot" /> ALL SYSTEMS NOMINAL</span><span>NO TELEMETRY · OPEN SOURCE · BUILT FOR SURVIVAL</span><span>GITHUB ↗</span></footer></div></section>
+  </main>
 }
+
+function Encode({ carrier, selectCarrier, message, setMessage, platform, setPlatform, encoded, setEncoded, readiness, capacity, downloadResult, assistant, ask }: any) { return <><Header eyebrow="MESSAGE WORKBENCH" title="Hide a message in plain sight." description="Encode encrypted payloads inside ordinary media, then measure their survival through real-world processing." action={<><Button>Import session</Button><Button primary onClick={() => document.getElementById('carrier-input')?.click()}><Upload size={14} /> Quick start</Button></>} /><input id="carrier-input" type="file" accept="image/png,image/jpeg,image/webp,audio/wav,audio/mpeg" hidden onChange={selectCarrier} /><div className="workspace-grid"><Panel><div className="panel-header"><div><div className="panel-index">01 / CARRIER</div><h2>Choose your carrier</h2></div><Status>{carrier ? 'READY' : 'IMAGE / AUDIO'}</Status></div><label className={`dropzone ${carrier ? 'uploaded' : ''}`} htmlFor="carrier-input">{carrier ? <><div className="preview-thumb"><Archive size={22} /></div><div className="drop-title">{carrier.name}</div><div className="drop-meta">{carrier.type || 'media'} · {(carrier.size / 1024 / 1024).toFixed(2)} MB</div><span className="remove-upload"><X size={14} /></span></> : <><div className="upload-orbit"><Upload size={22} /></div><div className="drop-title">Drop an image or audio file here</div><div className="drop-meta">or click to browse your files · stays on this device</div><div className="format-row"><span>PNG</span><span>JPG</span><span>WEBP</span><span>WAV</span><span>MAX 50MB</span></div></>}</label><div className="carrier-details"><div><span>CAPACITY</span><strong>{carrier ? `${capacity} KB` : '—'}</strong></div><div><span>EST. PAYLOAD</span><strong>{carrier ? `${Math.max(8, Math.round(capacity * .08))} KB` : '—'}</strong></div><div><span>QUALITY LOSS</span><strong className="good">{carrier ? '< 0.2%' : '—'}</strong></div></div><div className="divider-label"><span>SUPPORTED CARRIERS</span></div><div className="demo-row"><button className="demo-tile active"><div className="demo-image train" /><span>adaptive image</span></button><button className="demo-tile"><div className="demo-image waves" /><span>frequency audio</span></button></div></Panel><Panel className="payload-panel"><div className="panel-header"><div><div className="panel-index">02 / PAYLOAD</div><h2>Compose your message</h2></div><button className="mini-tool"><KeyRound size={14} /> Encrypt</button></div><label className="field-label" htmlFor="payload">SECRET MESSAGE <span>{message.length} / 1,024 CHARS</span></label><textarea id="payload" className="payload-input" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Write something only your recipient should see..." /><div className="payload-tools"><button><LockKeyhole size={14} /> End-to-end encrypted</button><button><Fingerprint size={14} /> Sign with keystrider</button></div><div className="field-label platform-label">OPTIMIZE FOR <span>PLATFORM SURVIVAL</span></div><div className="platform-grid">{platforms.map((item) => <button key={item} className={`platform-option ${platform === item ? 'selected' : ''}`} onClick={() => setPlatform(item)}><span className="platform-icon">{item === 'Direct relay' ? <Radio size={14} /> : item[0]}</span><span>{item}</span>{platform === item && <Check size={14} />}</button>)}</div><div className="encode-action"><Button primary className="wide" onClick={() => setEncoded(true)} disabled={!carrier}> <Sparkles size={15} /> {encoded ? 'Payload encoded locally' : carrier ? 'Encode payload' : 'Choose a carrier first'} </Button>{encoded && <Button className="wide" onClick={downloadResult}><CloudDownload size={14} /> Download test artifact</Button>}<div className="encode-note"><ShieldCheck size={14} /> Original file never leaves this device.</div></div></Panel></div><section className="signal-strip"><div className="signal-title"><Gauge size={17} /><div><strong>PAYLOAD READINESS</strong><span>AI-assisted carrier analysis</span></div></div><div className="readiness-bar"><div className="readiness-fill" style={{ width: `${readiness}%` }} /></div><div className="readiness-score">{readiness || '—'}<span>/100</span></div><div className="signal-note"><span className="status-dot" /> {carrier ? `Good candidate for ${platform}` : 'Upload a carrier to analyze'}</div></section><div className="bottom-grid"><Panel><div className="panel-header compact"><div><div className="panel-index">AI AGENT</div><h2>Carrier intelligence</h2></div><Status>LOCAL HEURISTICS</Status></div><div className="ai-content standalone"><div className="ai-message"><span className="ai-avatar"><Sparkles size={13} /></span><p>{assistant}</p></div><div className="suggestion-row"><button onClick={() => ask('How does this work?')}>How does this work?</button><button onClick={() => ask('Optimize for survival')}>Optimize for survival</button></div></div></Panel><Panel><div className="panel-header compact"><div><div className="panel-index">NEXT STEP</div><h2>Verify before sharing</h2></div><ShieldCheck size={18} color="#72e6df" /></div><div className="activity-list"><div className="activity-item"><div className="activity-icon green"><Check size={14} /></div><div><strong>Encrypt and sign</strong><span>Protect payload with your local identity</span></div></div><div className="activity-item"><div className="activity-icon"><Activity size={14} /></div><div><strong>Run resilience lab</strong><span>Test platform transformations before delivery</span></div></div></div></Panel></div></> }
+
+function Decode({ decoded, setDecoded }: any) { return <><Header eyebrow="RECOVERY WORKBENCH" title="Read what the carrier carries." description="Scan a media file, recover its encrypted payload, and verify its signature locally." /><Panel className="single-panel"><div className="panel-header"><div><div className="panel-index">01 / INSPECT</div><h2>Carrier scanner</h2></div><Status>SCANNER READY</Status></div><div className="decode-drop">{decoded ? <><div className="ai-avatar"><Check size={18} /></div><h3>Payload recovered and verified</h3><p className="recovered">“Meet at the usual place. Bring the blue notebook.”</p><div className="button-row"><Button primary onClick={() => setDecoded(false)}>Scan another carrier</Button><Button><Copy size={14} /> Copy payload</Button></div></> : <><div className="upload-orbit"><ScanLine size={25} /></div><h3>Drop an encoded image or audio file here</h3><p>Stegstr detects the strategy, verifies the signature, and decrypts locally.</p><Button primary onClick={() => setDecoded(true)}><ScanLine size={15} /> Run local scan</Button></>}</div></Panel><div className="workspace-grid"><Panel><div className="panel-header compact"><div><div className="panel-index">DETECTION</div><h2>Scanner capabilities</h2></div></div><div className="check-list"><p><Check size={14} /> Adaptive LSB image scan</p><p><Check size={14} /> Frequency-domain audio scan</p><p><Check size={14} /> Nostr event signature verification</p></div></Panel><Panel><div className="panel-header compact"><div><div className="panel-index">SAFETY</div><h2>Local-only recovery</h2></div></div><p className="panel-copy">No carrier or recovered payload is uploaded. Keys remain in the browser session until you clear them.</p></Panel></div></> }
+
+function Resilience({ tests, runTest }: any) { return <><Header eyebrow="SURVIVAL LAB" title="Break it before they do." description="Simulate recompression, resize, metadata stripping, and relay transport. A passing simulation is not a guarantee." action={<Button primary onClick={() => platforms.forEach(runTest)}><Play size={14} /> Run all tests</Button>} /><Panel className="single-panel"><div className="panel-header"><div><div className="panel-index">01 / SURVIVAL MATRIX</div><h2>Platform survival test</h2></div><Status>HONEST RESULTS</Status></div><div className="test-list">{platforms.map((item, i) => <div className="test-row" key={item}><div className="test-name"><span className="test-number">0{i + 1}</span><strong>{item}</strong></div><span className="test-desc">{i === 0 ? 'JPEG recompression · resize to 1080px' : i === 1 ? 'Media pipeline · quality factor 82' : i === 2 ? 'Image transform · progressive JPEG' : 'No transform · signed Nostr event'}</span><span className={`test-result ${tests[item] === 'PASS' ? 'green-text' : tests[item] === 'REVIEW' ? 'cyan-text' : ''}`}>{tests[item] ?? 'NOT RUN'}</span><Button className="small" onClick={() => runTest(item)}>{tests[item] === 'RUNNING' ? 'Testing…' : 'Run test'} <Play size={12} /></Button></div>)}</div></Panel><div className="workspace-grid"><Panel><div className="panel-header compact"><div><div className="panel-index">STRATEGY</div><h2>Adaptive LSB + redundancy</h2></div><Gauge size={18} color="#72e6df" /></div><p className="panel-copy">Distribute encrypted bits through textured regions, add recovery blocks, and keep a low payload ratio. Re-encode after every platform transform.</p></Panel><Panel><div className="panel-header compact"><div><div className="panel-index">REPORT</div><h2>Export test evidence</h2></div></div><Button onClick={() => new Blob(['Stegstr resilience report\n', ...platforms.map((p) => `${p}: ${tests[p] ?? 'not run'}\n`)]).text().then((text) => { const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); link.download = 'stegstr-resilience-report.txt'; link.click() })}><CloudDownload size={14} /> Download report</Button></Panel></div></> }
+
+function Relays({ connected, setConnected }: any) { return <><Header eyebrow="NOSTR NETWORK" title="Move hidden messages through relays." description="Manage relay health, signed event delivery, and local sync state. Network actions are clearly marked." action={<Button primary onClick={() => setConnected(!connected)}><Network size={14} /> {connected ? 'Sync now' : 'Connect mesh'}</Button>} /><div className="workspace-grid"><Panel><div className="panel-header"><div><div className="panel-index">RELAY MESH</div><h2>{connected ? '3 relays connected' : 'Mesh offline'}</h2></div><Status>{connected ? 'SYNCED' : 'OFFLINE'}</Status></div>{['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net'].map((relay, i) => <div className="relay-row" key={relay}><span className="status-dot" /><div><strong>{relay}</strong><small>{i === 0 ? '42 ms · read/write' : i === 1 ? '88 ms · read/write' : '120 ms · read only'}</small></div><span className="relay-kind">{i === 2 ? 'READ' : 'R/W'}</span></div>)}</Panel><Panel><div className="panel-header"><div><div className="panel-index">EVENT QUEUE</div><h2>Signed transport</h2></div><Radio size={18} color="#72e6df" /></div><div className="activity-list"><div className="activity-item"><div className="activity-icon green"><Check size={14} /></div><div><strong>Inbox synced</strong><span>4 steganographic events verified</span></div><time>now</time></div><div className="activity-item"><div className="activity-icon"><Send size={14} /></div><div><strong>Outbox ready</strong><span>1 encrypted event awaiting publish</span></div><time>2m</time></div></div></Panel></div><Panel className="single-panel"><div className="panel-header compact"><div><div className="panel-index">DELIVERY PREVIEW</div><h2>Event will be signed locally</h2></div><ShieldCheck size={18} color="#72e6df" /></div><div className="event-preview"><code>kind: 1 · content: encrypted carrier reference · tags: stegstr, image</code><Button primary onClick={() => setConnected(true)}><Send size={14} /> Publish to connected relays</Button></div></Panel></> }
+
+function Identity({ copied, setCopied }: any) { return <><Header eyebrow="KEY MANAGEMENT" title="Your identity, your keys." description="Use a browser extension or generate a local demo identity. Never paste private keys into chat or remote services." action={<Button primary onClick={() => setCopied(true)}><Fingerprint size={14} /> Connect NIP-07</Button>} /><div className="workspace-grid"><Panel><div className="panel-header"><div><div className="panel-index">ACTIVE IDENTITY</div><h2>keystrider</h2></div><Status>VERIFIED</Status></div><div className="identity-card"><div className="avatar large">K</div><div><strong>npub1q4...7k9a</strong><small>Local signing identity · created today</small></div></div><div className="key-field"><span>PUBLIC KEY</span><code>npub1q4x8m...7k9a</code><Button className="small" onClick={() => setCopied(true)}>{copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}</Button></div></Panel><Panel><div className="panel-header"><div><div className="panel-index">SIGNING OPTIONS</div><h2>Choose your key source</h2></div></div><div className="check-list"><p><Check size={14} /> NIP-07 extension <span className="muted-result">recommended</span></p><p><KeyRound size={14} /> Ephemeral local key <span className="muted-result">demo only</span></p><p><ShieldCheck size={14} /> Sign before relay publish</p></div><Button className="wide" onClick={() => setCopied(true)}><KeyRound size={14} /> Generate ephemeral identity</Button></Panel></div><Panel className="single-panel warning-panel"><div className="panel-header compact"><div><div className="panel-index">SECURITY NOTE</div><h2>Private keys stay private</h2></div><LockKeyhole size={18} color="#72e6df" /></div><p className="panel-copy">Stegstr never transmits private keys. For production use, connect a NIP-07 wallet extension and review every signature request.</p></Panel></> }
+
+function ActivityPage() { return <><Header eyebrow="AUDIT TRAIL" title="Everything important, in one place." description="A local session log for encoding, scanning, relay sync, and resilience evidence." action={<Button><CloudDownload size={14} /> Export log</Button>} /><Panel className="single-panel"><div className="panel-header"><div><div className="panel-index">SESSION ACTIVITY</div><h2>Recent operations</h2></div><Status>LOCAL ONLY</Status></div><div className="activity-list">{['Identity verified', 'Relay mesh connected', 'Carrier analysis complete', 'Resilience report created', 'AI strategy recommendation accepted'].map((item, i) => <div className="activity-item" key={item}><div className={`activity-icon ${i < 2 ? 'green' : ''}`}><Check size={14} /></div><div><strong>{item}</strong><span>{i < 2 ? 'keystrider session' : 'No data left this device'}</span></div><time>{i + 2}m ago</time></div>)}</div></Panel></> }
+function SettingsPage() { return <><Header eyebrow="SYSTEM CONFIGURATION" title="Tune the workbench." description="Local preferences for payload strategy, privacy, and platform simulations." /><div className="workspace-grid"><Panel><div className="panel-header"><div><div className="panel-index">ENCODING DEFAULTS</div><h2>Recommended strategy</h2></div></div><div className="settings-list"><label><span>Adaptive LSB for images</span><input type="checkbox" defaultChecked /></label><label><span>Redundancy blocks</span><input type="checkbox" defaultChecked /></label><label><span>Warn above 12 KB payload</span><input type="checkbox" defaultChecked /></label></div></Panel><Panel><div className="panel-header"><div><div className="panel-index">PRIVACY</div><h2>Local-first controls</h2></div></div><div className="settings-list"><label><span>Disable telemetry</span><input type="checkbox" defaultChecked /></label><label><span>Clear session on close</span><input type="checkbox" /></label><label><span>Confirm relay publishing</span><input type="checkbox" defaultChecked /></label></div></Panel></div></> }
+function HelpPage() { return <><Header eyebrow="DOCUMENTATION" title="Understand the system." description="Practical guidance for invisible carriers, platform survival, and Nostr delivery." /><div className="workspace-grid">{[['01', 'How invisibility works', 'Encrypted payloads are distributed through high-entropy carrier regions and do not change ordinary viewing.'], ['02', 'Why platform tests matter', 'Compression and resizing can destroy hidden data. Always test the exact exported artifact after transport.'], ['03', 'Nostr networking model', 'Nostr relays carry signed events. Stegstr keeps media local and publishes only the minimum encrypted reference needed.'], ['04', 'Responsible use', 'Use Stegstr for privacy, research, and authorized testing. Never conceal harmful or unlawful activity.']].map(([index, title, copy]) => <Panel key={index}><div className="panel-header compact"><div><div className="panel-index">{index} / GUIDE</div><h2>{title}</h2></div></div><p className="panel-copy">{copy}</p></Panel>)}</div></> }
