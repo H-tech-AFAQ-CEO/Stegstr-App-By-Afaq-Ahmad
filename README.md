@@ -1,33 +1,122 @@
-# Stegstr-App-By-Afaq-Ahmad
+# Stegstr
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+Stegstr is a privacy-focused, open-source steganography workbench for hiding encrypted messages inside images and audio while testing how well those hidden messages survive processing by major platforms.
 
-## Built with v0
+It brings steganography, encryption, decoding, resilience testing, Nostr connectivity, identity management, activity tracking, settings, and AI-assisted optimization together in a single secure interface.
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+## Features
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_BxFskKgqQuMg2f8irlmKbSJc3pTU)
+* **Image & Audio Steganography** — Embed encrypted messages inside supported media files.
+* **Message Decoding** — Extract and decode hidden messages from steganographic media.
+* **Resilience Testing** — Test whether hidden data survives common transformations and processing by major platforms.
+* **Encryption** — Protect messages before embedding them into media.
+* **Nostr Relay Connectivity** — Connect with Nostr relays for decentralized communication and data exchange.
+* **Identity Management** — Manage identities used within the Stegstr ecosystem.
+* **Activity Tracking** — Monitor recent actions and steganography-related activity.
+* **AI-Assisted Optimization** — Use AI-assisted techniques to help optimize hiding strategies and improve resilience.
+* **Privacy Focused** — Designed with privacy and secure local workflows in mind.
+* **Open Source** — Built to be transparent, inspectable, and extensible.
+
+## Tech Stack
+
+Stegstr is built with:
+
+* [Next.js](https://nextjs.org)
+* React
+* TypeScript
+* Modern web technologies
+* Nostr connectivity
+* AI-assisted optimization
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+Make sure you have Node.js and a package manager such as npm, yarn, or pnpm installed.
+
+### Install Dependencies
+
+```bash
+npm install
+```
+
+Or:
+
+```bash
+yarn install
+```
+
+Or:
+
+```bash
+pnpm install
+```
+
+### Run the Development Server
 
 ```bash
 npm run dev
-# or
+```
+
+Or:
+
+```bash
 yarn dev
-# or
+```
+
+Or:
+
+```bash
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 in your browser to launch Stegstr.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
+
+The application is organized around the core Stegstr workbench experience, including:
+
+* Steganography and encoding workflows
+* Decoding and extraction
+* Media resilience testing
+* Nostr relay connectivity
+* Identity management
+* Activity monitoring
+* Application settings
+* AI-assisted optimization
+
+## Privacy & Security
+
+Stegstr is designed around privacy-first principles. Messages are encrypted before being hidden inside media, and the workbench provides tools for evaluating whether embedded data remains recoverable after media processing.
+
+Users should still carefully review their deployment environment, cryptographic configuration, and operational security before using Stegstr for sensitive information.
+
+## Open Source
+
+Stegstr is open source and intended to provide a transparent workbench for experimenting with privacy-preserving steganography and resilience testing.
+
+Contributions, improvements, and security reviews are welcome.
+
+## Development
+
+To start developing, run:
+
+```bash
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Changes made to the application will be reflected automatically during development.
 
 ## Learn More
 
-To learn more, take a look at the following resources:
+For more information about the technologies used by Stegstr:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+* [Next.js Documentation](https://nextjs.org/docs)
+* [Next.js Learn](https://nextjs.org/learn)
+* [Nostr Documentation](https://nostr.com)
