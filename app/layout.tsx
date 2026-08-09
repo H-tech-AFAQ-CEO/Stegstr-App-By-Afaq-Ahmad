@@ -3,9 +3,9 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'stegstr.sh — FOSS steganography workbench',
+  description: 'Encode encrypted messages into ordinary media and test their survival across platforms.',
+  generator: 'stegstr.sh',
   icons: {
     icon: [
       {
@@ -26,11 +26,9 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  colorScheme: 'dark',
+  themeColor: '#0a0e11',
+  userScalable: false,
 }
 
 export default function RootLayout({
